@@ -2,8 +2,8 @@ package org.example.MODNAME.game;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import xyz.nucleoid.plasmid.game.config.PlayerConfig;
 import org.example.MODNAME.game.map.MODCLASSMapConfig;
+import xyz.nucleoid.plasmid.game.common.config.PlayerConfig;
 
 public class MODCLASSConfig {
     public static final Codec<MODCLASSConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(

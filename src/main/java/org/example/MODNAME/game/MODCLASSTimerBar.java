@@ -1,10 +1,10 @@
 package org.example.MODNAME.game;
 
 import net.minecraft.entity.boss.BossBar;
-import xyz.nucleoid.plasmid.widget.BossBarWidget;
-import xyz.nucleoid.plasmid.widget.GlobalWidgets;
 import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
+import xyz.nucleoid.plasmid.game.common.GlobalWidgets;
+import xyz.nucleoid.plasmid.game.common.widget.BossBarWidget;
 
 public final class MODCLASSTimerBar {
     private final BossBarWidget widget;

@@ -3,13 +3,14 @@ package org.example.MODNAME.game;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.math.Vec3d;
+import xyz.nucleoid.plasmid.game.GameCloseReason;
 import xyz.nucleoid.plasmid.game.GameSpace;
-import xyz.nucleoid.plasmid.game.event.*;
-import xyz.nucleoid.plasmid.game.player.JoinResult;
+import xyz.nucleoid.plasmid.game.common.GlobalWidgets;
+import xyz.nucleoid.plasmid.game.event.GameActivityEvents;
+import xyz.nucleoid.plasmid.game.event.GamePlayerEvents;
 import xyz.nucleoid.plasmid.game.player.PlayerSet;
-import xyz.nucleoid.plasmid.game.rule.GameRule;
-import xyz.nucleoid.plasmid.game.rule.RuleResult;
-import xyz.nucleoid.plasmid.widget.GlobalWidgets;
+import xyz.nucleoid.plasmid.game.rule.GameRuleType;
 import xyz.nucleoid.plasmid.util.PlayerRef;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -20,6 +21,8 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.world.GameMode;
 import org.example.MODNAME.game.map.MODCLASSMap;
+import xyz.nucleoid.stimuli.event.player.PlayerDamageEvent;
+import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,19 +33,20 @@ public class MODCLASSActive {
     public final GameSpace gameSpace;
     private final MODCLASSMap gameMap;
 
-    // TODO replace with ServerPlayerEntity if players are removed upon leaving
     private final Object2ObjectMap<PlayerRef, MODCLASSPlayer> participants;
     private final MODCLASSSpawnLogic spawnLogic;
     private final MODCLASSStageManager stageManager;
     private final boolean ignoreWinState;
     private final MODCLASSTimerBar timerBar;
+    private final ServerWorld world;
 
-    private MODCLASSActive(GameSpace gameSpace, MODCLASSMap map, GlobalWidgets widgets, MODCLASSConfig config, Set<PlayerRef> participants) {
+    private MODCLASSActive(GameSpace gameSpace, ServerWorld world, MODCLASSMap map, GlobalWidgets widgets, MODCLASSConfig config, Set<PlayerRef> participants) {
         this.gameSpace = gameSpace;
         this.config = config;
         this.gameMap = map;
-        this.spawnLogic = new MODCLASSSpawnLogic(gameSpace, map);
+        this.spawnLogic = new MODCLASSSpawnLogic(gameSpace, world, map);
         this.participants = new Object2ObjectOpenHashMap<>();
+        this.world = world;
 
         for (PlayerRef player : participants) {
             this.participants.put(player, new MODCLASSPlayer());
@@ -53,44 +57,43 @@ public class MODCLASSActive {
         this.timerBar = new MODCLASSTimerBar(widgets);
     }
 
-    public static void open(GameSpace gameSpace, MODCLASSMap map, MODCLASSConfig config) {
-        gameSpace.openGame(game -> {
+    public static void open(GameSpace gameSpace, ServerWorld world, MODCLASSMap map, MODCLASSConfig config) {
+        gameSpace.setActivity(game -> {
             Set<PlayerRef> participants = gameSpace.getPlayers().stream()
                     .map(PlayerRef::of)
                     .collect(Collectors.toSet());
-            GlobalWidgets widgets = new GlobalWidgets(game);
-            MODCLASSActive active = new MODCLASSActive(gameSpace, map, widgets, config, participants);
+            GlobalWidgets widgets = GlobalWidgets.addTo(game);
+            MODCLASSActive active = new MODCLASSActive(gameSpace, world, map, widgets, config, participants);
 
-            game.setRule(GameRule.CRAFTING, RuleResult.DENY);
-            game.setRule(GameRule.PORTALS, RuleResult.DENY);
-            game.setRule(GameRule.PVP, RuleResult.DENY);
-            game.setRule(GameRule.HUNGER, RuleResult.DENY);
-            game.setRule(GameRule.FALL_DAMAGE, RuleResult.DENY);
-            game.setRule(GameRule.INTERACTION, RuleResult.DENY);
-            game.setRule(GameRule.BLOCK_DROPS, RuleResult.DENY);
-            game.setRule(GameRule.THROW_ITEMS, RuleResult.DENY);
-            game.setRule(GameRule.UNSTABLE_TNT, RuleResult.DENY);
+            game.setRule(GameRuleType.CRAFTING, ActionResult.FAIL);
+            game.setRule(GameRuleType.PORTALS, ActionResult.FAIL);
+            game.setRule(GameRuleType.PVP, ActionResult.FAIL);
+            game.setRule(GameRuleType.HUNGER, ActionResult.FAIL);
+            game.setRule(GameRuleType.FALL_DAMAGE, ActionResult.FAIL);
+            game.setRule(GameRuleType.INTERACTION, ActionResult.FAIL);
+            game.setRule(GameRuleType.BLOCK_DROPS, ActionResult.FAIL);
+            game.setRule(GameRuleType.THROW_ITEMS, ActionResult.FAIL);
+            game.setRule(GameRuleType.UNSTABLE_TNT, ActionResult.FAIL);
 
-            game.on(GameOpenListener.EVENT, active::onOpen);
-            game.on(GameCloseListener.EVENT, active::onClose);
+            game.listen(GameActivityEvents.ENABLE, active::onOpen);
+            game.listen(GameActivityEvents.DISABLE, active::onClose);
 
-            game.on(OfferPlayerListener.EVENT, player -> JoinResult.ok());
-            game.on(PlayerAddListener.EVENT, active::addPlayer);
-            game.on(PlayerRemoveListener.EVENT, active::removePlayer);
+            game.listen(GamePlayerEvents.OFFER, (offer) -> offer.accept(world, Vec3d.ZERO));
+            game.listen(GamePlayerEvents.ADD, active::addPlayer);
+            game.listen(GamePlayerEvents.REMOVE, active::removePlayer);
 
-            game.on(GameTickListener.EVENT, active::tick);
+            game.listen(GameActivityEvents.TICK, active::tick);
 
-            game.on(PlayerDamageListener.EVENT, active::onPlayerDamage);
-            game.on(PlayerDeathListener.EVENT, active::onPlayerDeath);
+            game.listen(PlayerDamageEvent.EVENT, active::onPlayerDamage);
+            game.listen(PlayerDeathEvent.EVENT, active::onPlayerDeath);
         });
     }
 
     private void onOpen() {
-        ServerWorld world = this.gameSpace.getWorld();
         for (PlayerRef ref : this.participants.keySet()) {
-            ref.ifOnline(world, this::spawnParticipant);
+            ref.ifOnline(this.world, this::spawnParticipant);
         }
-        this.stageManager.onOpen(world.getTime(), this.config);
+        this.stageManager.onOpen(this.world.getTime(), this.config);
         // TODO setup logic
     }
 
@@ -131,8 +134,7 @@ public class MODCLASSActive {
     }
 
     private void tick() {
-        ServerWorld world = this.gameSpace.getWorld();
-        long time = world.getTime();
+        long time = this.world.getTime();
 
         MODCLASSStageManager.IdleTickResult result = this.stageManager.tick(time, gameSpace);
 
@@ -145,7 +147,7 @@ public class MODCLASSActive {
                 this.broadcastWin(this.checkWinResult());
                 return;
             case GAME_CLOSED:
-                this.gameSpace.close();
+                this.gameSpace.close(GameCloseReason.FINISHED);
                 return;
         }
 
@@ -166,7 +168,7 @@ public class MODCLASSActive {
 
         PlayerSet players = this.gameSpace.getPlayers();
         players.sendMessage(message);
-        players.sendSound(SoundEvents.ENTITY_VILLAGER_YES);
+        players.playSound(SoundEvents.ENTITY_VILLAGER_YES);
     }
 
     private WinResult checkWinResult() {
@@ -175,7 +177,6 @@ public class MODCLASSActive {
             return WinResult.no();
         }
 
-        ServerWorld world = this.gameSpace.getWorld();
         ServerPlayerEntity winningPlayer = null;
 
         // TODO win result logic

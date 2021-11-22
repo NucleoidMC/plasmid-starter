@@ -15,14 +15,16 @@ import org.example.MODNAME.game.map.MODCLASSMap;
 public class MODCLASSSpawnLogic {
     private final GameSpace gameSpace;
     private final MODCLASSMap map;
+    private final ServerWorld world;
 
-    public MODCLASSSpawnLogic(GameSpace gameSpace, MODCLASSMap map) {
+    public MODCLASSSpawnLogic(GameSpace gameSpace, ServerWorld world, MODCLASSMap map) {
         this.gameSpace = gameSpace;
         this.map = map;
+        this.world = world;
     }
 
     public void resetPlayer(ServerPlayerEntity player, GameMode gameMode) {
-        player.setGameMode(gameMode);
+        player.changeGameMode(gameMode);
         player.setVelocity(Vec3d.ZERO);
         player.fallDistance = 0.0f;
 
@@ -36,8 +38,6 @@ public class MODCLASSSpawnLogic {
     }
 
     public void spawnPlayer(ServerPlayerEntity player) {
-        ServerWorld world = this.gameSpace.getWorld();
-
         BlockPos pos = this.map.spawn;
         if (pos == null) {
             MODCLASS.LOGGER.error("Cannot spawn player! No spawn is defined in the map!");
@@ -48,6 +48,6 @@ public class MODCLASSSpawnLogic {
         float x = pos.getX() + MathHelper.nextFloat(player.getRandom(), -radius, radius);
         float z = pos.getZ() + MathHelper.nextFloat(player.getRandom(), -radius, radius);
 
-        player.teleport(world, x, pos.getY(), z, 0.0F, 0.0F);
+        player.teleport(this.world, x, pos.getY(), z, 0.0F, 0.0F);
     }
 }

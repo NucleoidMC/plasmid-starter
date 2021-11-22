@@ -1,10 +1,10 @@
 package org.example.MODNAME.game.map;
 
 import net.minecraft.server.MinecraftServer;
-import xyz.nucleoid.plasmid.map.template.MapTemplate;
-import xyz.nucleoid.plasmid.map.template.TemplateChunkGenerator;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
+import xyz.nucleoid.map_templates.MapTemplate;
+import xyz.nucleoid.plasmid.game.world.generator.TemplateChunkGenerator;
 
 public class MODCLASSMap {
     private final MapTemplate template;

@@ -1,51 +1,58 @@
 package org.example.MODNAME.game;
 
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.math.Vec3d;
+import xyz.nucleoid.fantasy.RuntimeWorldConfig;
 import xyz.nucleoid.plasmid.game.*;
-import xyz.nucleoid.plasmid.game.event.*;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.GameMode;
 import org.example.MODNAME.game.map.MODCLASSMap;
 import org.example.MODNAME.game.map.MODCLASSMapGenerator;
-import xyz.nucleoid.fantasy.BubbleWorldConfig;
+import xyz.nucleoid.plasmid.game.common.GameWaitingLobby;
+import xyz.nucleoid.plasmid.game.event.GameActivityEvents;
+import xyz.nucleoid.plasmid.game.event.GamePlayerEvents;
+import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
 
 public class MODCLASSWaiting {
     private final GameSpace gameSpace;
     private final MODCLASSMap map;
     private final MODCLASSConfig config;
     private final MODCLASSSpawnLogic spawnLogic;
+    private final ServerWorld world;
 
-    private MODCLASSWaiting(GameSpace gameSpace, MODCLASSMap map, MODCLASSConfig config) {
+    private MODCLASSWaiting(GameSpace gameSpace, ServerWorld world, MODCLASSMap map, MODCLASSConfig config) {
         this.gameSpace = gameSpace;
         this.map = map;
         this.config = config;
-        this.spawnLogic = new MODCLASSSpawnLogic(gameSpace, map);
+        this.world = world;
+        this.spawnLogic = new MODCLASSSpawnLogic(gameSpace, world, map);
     }
 
     public static GameOpenProcedure open(GameOpenContext<MODCLASSConfig> context) {
-        MODCLASSConfig config = context.getConfig();
+        MODCLASSConfig config = context.config();
         MODCLASSMapGenerator generator = new MODCLASSMapGenerator(config.mapConfig);
         MODCLASSMap map = generator.build();
 
-        BubbleWorldConfig worldConfig = new BubbleWorldConfig()
-                .setGenerator(map.asGenerator(context.getServer()))
-                .setDefaultGameMode(GameMode.SPECTATOR);
+        RuntimeWorldConfig worldConfig = new RuntimeWorldConfig()
+                .setGenerator(map.asGenerator(context.server()));
 
-        return context.createOpenProcedure(worldConfig, game -> {
-            MODCLASSWaiting waiting = new MODCLASSWaiting(game.getSpace(), map, context.getConfig());
+        return context.openWithWorld(worldConfig, (game, world) -> {
+            MODCLASSWaiting waiting = new MODCLASSWaiting(game.getGameSpace(), world, map, context.config());
 
-            GameWaitingLobby.applyTo(game, config.playerConfig);
+            GameWaitingLobby.addTo(game, config.playerConfig);
 
-            game.on(RequestStartListener.EVENT, waiting::requestStart);
-            game.on(PlayerAddListener.EVENT, waiting::addPlayer);
-            game.on(PlayerDeathListener.EVENT, waiting::onPlayerDeath);
+            game.listen(GameActivityEvents.REQUEST_START, waiting::requestStart);
+            game.listen(GamePlayerEvents.ADD, waiting::addPlayer);
+            game.listen(GamePlayerEvents.OFFER, (offer) -> offer.accept(world, Vec3d.ZERO));
+            game.listen(PlayerDeathEvent.EVENT, waiting::onPlayerDeath);
         });
     }
 
-    private StartResult requestStart() {
-        MODCLASSActive.open(this.gameSpace, this.map, this.config);
-        return StartResult.OK;
+    private GameResult requestStart() {
+        MODCLASSActive.open(this.gameSpace, this.world, this.map, this.config);
+        return GameResult.ok();
     }
 
     private void addPlayer(ServerPlayerEntity player) {

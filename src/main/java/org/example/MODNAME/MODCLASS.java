@@ -15,8 +15,8 @@ public class MODCLASS implements ModInitializer {
 
     public static final GameType<MODCLASSConfig> TYPE = GameType.register(
             new Identifier(ID, "MODNAME"),
-            MODCLASSWaiting::open,
-            MODCLASSConfig.CODEC
+            MODCLASSConfig.CODEC,
+            MODCLASSWaiting::open
     );
 
     @Override

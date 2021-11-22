@@ -52,7 +52,7 @@ public class MODCLASSStageManager {
             if (!this.setSpectator) {
                 this.setSpectator = true;
                 for (ServerPlayerEntity player : space.getPlayers()) {
-                    player.setGameMode(GameMode.SPECTATOR);
+                    player.changeGameMode(GameMode.SPECTATOR);
                 }
             }
 
@@ -87,7 +87,7 @@ public class MODCLASSStageManager {
                 Set<Flag> flags = ImmutableSet.of(Flag.X_ROT, Flag.Y_ROT);
 
                 // Teleport without changing the pitch and yaw
-                player.networkHandler.teleportRequest(destX, destY, destZ, player.yaw, player.pitch, flags);
+                player.networkHandler.requestTeleport(destX, destY, destZ, player.getYaw(), player.getPitch(), flags);
             }
         }
 
@@ -97,11 +97,11 @@ public class MODCLASSStageManager {
             PlayerSet players = space.getPlayers();
 
             if (sec > 0) {
-                players.sendTitle(new LiteralText(Integer.toString(sec)).formatted(Formatting.BOLD));
-                players.sendSound(SoundEvents.BLOCK_NOTE_BLOCK_HARP, SoundCategory.PLAYERS, 1.0F, 1.0F);
+                players.showTitle(new LiteralText(Integer.toString(sec)).formatted(Formatting.BOLD), 20);
+                players.playSound(SoundEvents.BLOCK_NOTE_BLOCK_HARP, SoundCategory.PLAYERS, 1.0F, 1.0F);
             } else {
-                players.sendTitle(new LiteralText("Go!").formatted(Formatting.BOLD));
-                players.sendSound(SoundEvents.BLOCK_NOTE_BLOCK_HARP, SoundCategory.PLAYERS, 1.0F, 2.0F);
+                players.showTitle(new LiteralText("Go!").formatted(Formatting.BOLD), 20);
+                players.playSound(SoundEvents.BLOCK_NOTE_BLOCK_HARP, SoundCategory.PLAYERS, 1.0F, 2.0F);
             }
         }
     }

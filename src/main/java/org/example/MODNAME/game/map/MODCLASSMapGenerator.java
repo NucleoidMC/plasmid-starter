@@ -1,13 +1,7 @@
 package org.example.MODNAME.game.map;
 
-import xyz.nucleoid.plasmid.map.template.MapTemplate;
-import xyz.nucleoid.plasmid.util.BlockBounds;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.Util;
+import xyz.nucleoid.map_templates.MapTemplate;
 import net.minecraft.util.math.BlockPos;
-import org.example.MODNAME.game.MODCLASSConfig;
-
-import java.util.concurrent.CompletableFuture;
 
 public class MODCLASSMapGenerator {
 
