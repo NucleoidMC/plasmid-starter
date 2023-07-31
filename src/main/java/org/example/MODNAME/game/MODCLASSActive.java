@@ -16,7 +16,6 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.LiteralText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.world.GameMode;
@@ -161,9 +160,9 @@ public class MODCLASSActive {
 
         Text message;
         if (winningPlayer != null) {
-            message = winningPlayer.getDisplayName().shallowCopy().append(" has won the game!").formatted(Formatting.GOLD);
+            message = winningPlayer.getDisplayName().copy().append(" has won the game!").formatted(Formatting.GOLD);
         } else {
-            message = new LiteralText("The game ended, but nobody won!").formatted(Formatting.GOLD);
+            message = Text.literal("The game ended, but nobody won!").formatted(Formatting.GOLD);
         }
 
         PlayerSet players = this.gameSpace.getPlayers();
