@@ -4,15 +4,17 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.Vec3d;
 import xyz.nucleoid.fantasy.RuntimeWorldConfig;
-import xyz.nucleoid.plasmid.game.*;
+import xyz.nucleoid.plasmid.api.game.*;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.GameMode;
 import org.example.MODNAME.game.map.MODCLASSMap;
 import org.example.MODNAME.game.map.MODCLASSMapGenerator;
-import xyz.nucleoid.plasmid.game.common.GameWaitingLobby;
-import xyz.nucleoid.plasmid.game.event.GameActivityEvents;
-import xyz.nucleoid.plasmid.game.event.GamePlayerEvents;
+import xyz.nucleoid.plasmid.api.game.common.GameWaitingLobby;
+import xyz.nucleoid.plasmid.api.game.event.GameActivityEvents;
+import xyz.nucleoid.plasmid.api.game.event.GamePlayerEvents;
+import xyz.nucleoid.plasmid.api.game.player.JoinOffer;
+import xyz.nucleoid.stimuli.event.EventResult;
 import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
 
 public class MODCLASSWaiting {
@@ -32,7 +34,7 @@ public class MODCLASSWaiting {
 
     public static GameOpenProcedure open(GameOpenContext<MODCLASSConfig> context) {
         MODCLASSConfig config = context.config();
-        MODCLASSMapGenerator generator = new MODCLASSMapGenerator(config.mapConfig);
+        MODCLASSMapGenerator generator = new MODCLASSMapGenerator(config.mapConfig());
         MODCLASSMap map = generator.build();
 
         RuntimeWorldConfig worldConfig = new RuntimeWorldConfig()
@@ -41,11 +43,12 @@ public class MODCLASSWaiting {
         return context.openWithWorld(worldConfig, (game, world) -> {
             MODCLASSWaiting waiting = new MODCLASSWaiting(game.getGameSpace(), world, map, context.config());
 
-            GameWaitingLobby.addTo(game, config.playerConfig);
+            GameWaitingLobby.addTo(game, config.players());
 
             game.listen(GameActivityEvents.REQUEST_START, waiting::requestStart);
             game.listen(GamePlayerEvents.ADD, waiting::addPlayer);
-            game.listen(GamePlayerEvents.OFFER, (offer) -> offer.accept(world, Vec3d.ZERO));
+            game.listen(GamePlayerEvents.OFFER, JoinOffer::accept);
+            game.listen(GamePlayerEvents.ACCEPT, joinAcceptor -> joinAcceptor.teleport(world, Vec3d.ZERO));
             game.listen(PlayerDeathEvent.EVENT, waiting::onPlayerDeath);
         });
     }
@@ -59,10 +62,10 @@ public class MODCLASSWaiting {
         this.spawnPlayer(player);
     }
 
-    private ActionResult onPlayerDeath(ServerPlayerEntity player, DamageSource source) {
+    private EventResult onPlayerDeath(ServerPlayerEntity player, DamageSource source) {
         player.setHealth(20.0f);
         this.spawnPlayer(player);
-        return ActionResult.FAIL;
+        return EventResult.DENY;
     }
 
     private void spawnPlayer(ServerPlayerEntity player) {

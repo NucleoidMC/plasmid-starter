@@ -1,7 +1,7 @@
 package org.example.MODNAME.game;
 
 import net.minecraft.util.math.Vec3d;
-import xyz.nucleoid.plasmid.game.GameSpace;
+import xyz.nucleoid.plasmid.api.game.GameSpace;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -11,6 +11,8 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.GameMode;
 import org.example.MODNAME.MODCLASS;
 import org.example.MODNAME.game.map.MODCLASSMap;
+
+import java.util.Set;
 
 public class MODCLASSSpawnLogic {
     private final GameSpace gameSpace;
@@ -48,6 +50,6 @@ public class MODCLASSSpawnLogic {
         float x = pos.getX() + MathHelper.nextFloat(player.getRandom(), -radius, radius);
         float z = pos.getZ() + MathHelper.nextFloat(player.getRandom(), -radius, radius);
 
-        player.teleport(this.world, x, pos.getY(), z, 0.0F, 0.0F);
+        player.teleport(this.world, x, pos.getY(), z, Set.of(), 0.0F, 0.0F, true);
     }
 }

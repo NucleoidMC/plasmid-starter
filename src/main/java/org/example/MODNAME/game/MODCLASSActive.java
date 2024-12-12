@@ -4,14 +4,15 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.Vec3d;
-import xyz.nucleoid.plasmid.game.GameCloseReason;
-import xyz.nucleoid.plasmid.game.GameSpace;
-import xyz.nucleoid.plasmid.game.common.GlobalWidgets;
-import xyz.nucleoid.plasmid.game.event.GameActivityEvents;
-import xyz.nucleoid.plasmid.game.event.GamePlayerEvents;
-import xyz.nucleoid.plasmid.game.player.PlayerSet;
-import xyz.nucleoid.plasmid.game.rule.GameRuleType;
-import xyz.nucleoid.plasmid.util.PlayerRef;
+import xyz.nucleoid.plasmid.api.game.GameCloseReason;
+import xyz.nucleoid.plasmid.api.game.GameSpace;
+import xyz.nucleoid.plasmid.api.game.common.GlobalWidgets;
+import xyz.nucleoid.plasmid.api.game.event.GameActivityEvents;
+import xyz.nucleoid.plasmid.api.game.event.GamePlayerEvents;
+import xyz.nucleoid.plasmid.api.game.player.JoinOffer;
+import xyz.nucleoid.plasmid.api.game.player.PlayerSet;
+import xyz.nucleoid.plasmid.api.game.rule.GameRuleType;
+import xyz.nucleoid.plasmid.api.util.PlayerRef;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -20,6 +21,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.world.GameMode;
 import org.example.MODNAME.game.map.MODCLASSMap;
+import xyz.nucleoid.stimuli.event.EventResult;
 import xyz.nucleoid.stimuli.event.player.PlayerDamageEvent;
 import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
 
@@ -58,26 +60,28 @@ public class MODCLASSActive {
 
     public static void open(GameSpace gameSpace, ServerWorld world, MODCLASSMap map, MODCLASSConfig config) {
         gameSpace.setActivity(game -> {
-            Set<PlayerRef> participants = gameSpace.getPlayers().stream()
+            Set<PlayerRef> participants = gameSpace.getPlayers().participants().stream()
                     .map(PlayerRef::of)
                     .collect(Collectors.toSet());
             GlobalWidgets widgets = GlobalWidgets.addTo(game);
             MODCLASSActive active = new MODCLASSActive(gameSpace, world, map, widgets, config, participants);
 
-            game.setRule(GameRuleType.CRAFTING, ActionResult.FAIL);
-            game.setRule(GameRuleType.PORTALS, ActionResult.FAIL);
-            game.setRule(GameRuleType.PVP, ActionResult.FAIL);
-            game.setRule(GameRuleType.HUNGER, ActionResult.FAIL);
-            game.setRule(GameRuleType.FALL_DAMAGE, ActionResult.FAIL);
-            game.setRule(GameRuleType.INTERACTION, ActionResult.FAIL);
-            game.setRule(GameRuleType.BLOCK_DROPS, ActionResult.FAIL);
-            game.setRule(GameRuleType.THROW_ITEMS, ActionResult.FAIL);
-            game.setRule(GameRuleType.UNSTABLE_TNT, ActionResult.FAIL);
+            game.setRule(GameRuleType.CRAFTING, EventResult.DENY);
+            game.setRule(GameRuleType.PORTALS, EventResult.DENY);
+            game.setRule(GameRuleType.PVP, EventResult.DENY);
+            game.setRule(GameRuleType.HUNGER, EventResult.DENY);
+            game.setRule(GameRuleType.FALL_DAMAGE, EventResult.DENY);
+            game.setRule(GameRuleType.INTERACTION, EventResult.DENY);
+            game.setRule(GameRuleType.BLOCK_DROPS, EventResult.DENY);
+            game.setRule(GameRuleType.THROW_ITEMS, EventResult.DENY);
+            game.setRule(GameRuleType.UNSTABLE_TNT, EventResult.DENY);
 
             game.listen(GameActivityEvents.ENABLE, active::onOpen);
             game.listen(GameActivityEvents.DISABLE, active::onClose);
+            game.listen(GameActivityEvents.STATE_UPDATE, state -> state.canPlay(false));
 
-            game.listen(GamePlayerEvents.OFFER, (offer) -> offer.accept(world, Vec3d.ZERO));
+            game.listen(GamePlayerEvents.OFFER, JoinOffer::acceptSpectators);
+            game.listen(GamePlayerEvents.ACCEPT, joinAcceptor -> joinAcceptor.teleport(world, Vec3d.ZERO));
             game.listen(GamePlayerEvents.ADD, active::addPlayer);
             game.listen(GamePlayerEvents.REMOVE, active::removePlayer);
 
@@ -89,9 +93,13 @@ public class MODCLASSActive {
     }
 
     private void onOpen() {
-        for (PlayerRef ref : this.participants.keySet()) {
-            ref.ifOnline(this.world, this::spawnParticipant);
+        for (var participant : this.gameSpace.getPlayers().participants()) {
+            this.spawnParticipant(participant);
         }
+        for (var spectator : this.gameSpace.getPlayers().spectators()) {
+            this.spawnSpectator(spectator);
+        }
+
         this.stageManager.onOpen(this.world.getTime(), this.config);
         // TODO setup logic
     }
@@ -101,7 +109,7 @@ public class MODCLASSActive {
     }
 
     private void addPlayer(ServerPlayerEntity player) {
-        if (!this.participants.containsKey(PlayerRef.of(player))) {
+        if (!this.participants.containsKey(PlayerRef.of(player)) || this.gameSpace.getPlayers().spectators().contains(player)) {
             this.spawnSpectator(player);
         }
     }
@@ -110,16 +118,16 @@ public class MODCLASSActive {
         this.participants.remove(PlayerRef.of(player));
     }
 
-    private ActionResult onPlayerDamage(ServerPlayerEntity player, DamageSource source, float amount) {
+    private EventResult onPlayerDamage(ServerPlayerEntity player, DamageSource source, float amount) {
         // TODO handle damage
         this.spawnParticipant(player);
-        return ActionResult.FAIL;
+        return EventResult.DENY;
     }
 
-    private ActionResult onPlayerDeath(ServerPlayerEntity player, DamageSource source) {
+    private EventResult onPlayerDeath(ServerPlayerEntity player, DamageSource source) {
         // TODO handle death
         this.spawnParticipant(player);
-        return ActionResult.FAIL;
+        return EventResult.DENY;
     }
 
     private void spawnParticipant(ServerPlayerEntity player) {
@@ -150,7 +158,7 @@ public class MODCLASSActive {
                 return;
         }
 
-        this.timerBar.update(this.stageManager.finishTime - time, this.config.timeLimitSecs * 20);
+        this.timerBar.update(this.stageManager.finishTime - time, this.config.timeLimitSecs() * 20);
 
         // TODO tick logic
     }
